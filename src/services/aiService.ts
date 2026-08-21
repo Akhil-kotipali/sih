@@ -171,9 +171,9 @@ export async function checkInferenceReady(settingsOverride?: AISettings): Promis
  */
 export function getActiveProviderModel(settings: AISettings): string {
   if (settings.provider === 'gemini_server' || settings.provider === 'gemini_client') {
-    const raw = settings.models?.gemini || 'gemini-3.6-flash';
-    if (raw === 'gemini-2.5-flash' || raw === 'gemini-2.0-flash' || raw === 'gemini-1.5-flash') {
-      return 'gemini-3.6-flash';
+    const raw = settings.models?.gemini || 'gemini-3.7-flash';
+    if (raw === 'gemini-2.5-flash' || raw === 'gemini-2.0-flash' || raw === 'gemini-1.5-flash' || raw === 'gemini-pro') {
+      return 'gemini-3.7-flash';
     }
     return raw;
   }
@@ -189,7 +189,7 @@ export function getActiveProviderModel(settings: AISettings): string {
   if (settings.provider === 'custom') {
     return settings.models?.custom || 'gpt-4o-mini';
   }
-  return settings.customModel || 'gemini-3.6-flash';
+  return settings.customModel || 'gemini-3.7-flash';
 }
 
 /**
@@ -316,9 +316,9 @@ export async function callAI(
     try {
       const apiKey = settings.keys.gemini.trim();
       const effectiveModel =
-        activeModel && !['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'].includes(activeModel)
+        activeModel && !['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro'].includes(activeModel)
           ? activeModel
-          : 'gemini-3.6-flash';
+          : 'gemini-3.7-flash';
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${apiKey}`;
 
       const contents: any[] = [];
@@ -1007,12 +1007,16 @@ export async function evaluateAssessmentBatch(
   const percentage = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
 
   // Calculate dimensional mastery breakdown & structured evidence for Prompt 2
-  const dimensionTotals: Record<CognitiveDimension, { earned: number; possible: number }> = {
+  const dimensionTotals: Record<string, { earned: number; possible: number }> = {
     concept: { earned: 0, possible: 0 },
     application: { earned: 0, possible: 0 },
     implementation: { earned: 0, possible: 0 },
     debugging: { earned: 0, possible: 0 },
     algorithmic_thinking: { earned: 0, possible: 0 },
+    problem_solving: { earned: 0, possible: 0 },
+    derivation: { earned: 0, possible: 0 },
+    comprehension: { earned: 0, possible: 0 },
+    analysis: { earned: 0, possible: 0 },
   };
 
   let correctCount = 0;
@@ -1035,9 +1039,11 @@ export async function evaluateAssessmentBatch(
 
   const dimensionScores: Record<string, number> = {};
   const weakDimensions: string[] = [];
+  const dimensionPercentageScores: Record<string, number> = {};
   for (const [dim, val] of Object.entries(dimensionTotals)) {
     const ratio = val.possible > 0 ? Number((val.earned / val.possible).toFixed(2)) : 1.0;
     dimensionScores[dim] = ratio;
+    dimensionPercentageScores[dim] = Math.round(ratio * 100);
     if (val.possible > 0 && ratio < 0.65) {
       weakDimensions.push(dim);
     }
@@ -1066,11 +1072,18 @@ export async function evaluateAssessmentBatch(
   };
 
   // 2. Perform AI Cognitive Analysis of the Batch (System Prompt 2: Adaptive Analysis Mode)
-  let aiAnalysis = {
+  let aiAnalysis: {
+    summary: string;
+    strengths: string[];
+    weaknesses: string[];
+    recommendedFocus: string;
+    dimensionScores?: Record<string, number>;
+  } = {
     summary: `You scored ${percentage}% on this batch (${totalEarned}/${totalPossible} pts).`,
     strengths: percentage >= 70 ? ['Solid conceptual foundation', 'Good precision'] : ['Completed all questions'],
     weaknesses: weakDimensions.length > 0 ? weakDimensions.map((w) => `Reinforce ${w} skills`) : percentage < 70 ? ['Needs review on edge cases', 'Review core syntax and order'] : [],
     recommendedFocus: percentage >= 80 ? 'Ready for advanced problem solving and deep practice.' : 'Focus on foundational definitions and practice problems.',
+    dimensionScores: dimensionPercentageScores,
   };
 
   const adaptivePrompt = settings.systemPrompts.assessmentAdaptive || settings.systemPrompts.assessment;
@@ -1098,6 +1111,7 @@ export async function evaluateAssessmentBatch(
             strengths: data.analysis.strengths || aiAnalysis.strengths,
             weaknesses: data.analysis.weaknesses || aiAnalysis.weaknesses,
             recommendedFocus: data.analysis.recommendedFocus || aiAnalysis.recommendedFocus,
+            dimensionScores: dimensionPercentageScores,
           };
           return {
             submissions: evaluatedSubmissions,
@@ -1131,7 +1145,10 @@ Provide an encouraging, actionable breakdown in JSON:
     });
     const parsed = JSON.parse(res.text.replace(/```json/gi, '').replace(/```/g, '').trim());
     if (parsed.summary) {
-      aiAnalysis = parsed;
+      aiAnalysis = {
+        ...parsed,
+        dimensionScores: dimensionPercentageScores,
+      };
     }
   } catch (e) {
     console.warn('AI analysis fallback used:', e);

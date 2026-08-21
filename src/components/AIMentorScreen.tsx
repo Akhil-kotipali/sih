@@ -33,8 +33,16 @@ import {
   Paperclip,
 } from 'lucide-react';
 
+export interface MentorContext {
+  topic?: string;
+  weakDimensions?: string[];
+  masteryScore?: number;
+  initialQuestion?: string;
+}
+
 interface AIMentorScreenProps {
   user: UserProfile;
+  initialContext?: MentorContext | null;
   onLaunchPractice: (topic: string) => void;
 }
 
@@ -64,50 +72,51 @@ const MENTOR_MODES: Record<
   { label: string; icon: any; desc: string; systemDirective: string; badgeColor: string }
 > = {
   socratic: {
-    label: 'Engineering Professor',
+    label: 'Academic Professor',
     icon: GraduationCap,
-    desc: 'First-principles derivations, invariants & conceptual intuition',
+    desc: 'First-principles derivations, conceptual intuition & Socratic inquiry',
     systemDirective:
-      'Adopt the persona of an inspiring, rigorous CS professor. Explain concepts starting from first principles and mathematical invariants. Guide the student using the Socratic method when appropriate, and reinforce foundational intuition.',
+      'Adopt the persona of an inspiring, rigorous university professor across sciences, humanities, or technical fields. Explain concepts starting from first principles and fundamental definitions. Guide the learner using the Socratic method when appropriate, and reinforce deep foundational intuition.',
     badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   },
   interviewer: {
-    label: 'FAANG Interviewer',
+    label: 'Rigorous Examiner',
     icon: Briefcase,
-    desc: 'DSA optimization, Big-O trade-offs & edge-case grilling',
+    desc: 'Oral examination grilling, edge cases & deep-dive follow-ups',
     systemDirective:
-      'Adopt the persona of a senior technical interviewer at a tier-1 tech company. Grill the student on asymptotic time/space complexities, potential memory bottlenecks, edge cases, and follow-up optimization questions.',
+      'Adopt the persona of a senior examiner and domain expert. Grill the learner on conceptual nuances, edge cases, rigorous definitions, and problem-solving strategies. Provide constructive, high-standard critical feedback.',
     badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   },
   architect: {
-    label: 'Systems Architect',
+    label: 'Theory & Systems Architect',
     icon: Layers,
-    desc: 'Scalability, distributed systems, CAP theorem & microservices',
+    desc: 'High-level synthesis, structural models & trade-off analysis',
     systemDirective:
-      'Adopt the persona of a Principal Systems Architect. Evaluate designs and questions based on latency, throughput, consistency models, fault tolerance, caching, and horizontal scaling trade-offs.',
+      'Adopt the persona of a Principal Architect and Theoretical Synthesizer. Evaluate ideas, frameworks, and designs based on trade-offs, structural integrity, systemic constraints, and holistic models.',
     badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
   },
   debugger: {
-    label: 'Code Debugger',
+    label: 'Analytical Troubleshooter',
     icon: Bug,
-    desc: 'Line-by-line tracing, memory leaks & error log analysis',
+    desc: 'Step-by-step error analysis, proofs & logical fallacy identification',
     systemDirective:
-      'Adopt the persona of an expert compiler engineer and debugging specialist. Analyze code snippets, error traces, and screenshots with extreme precision, pinpointing logical flaws, off-by-one errors, and memory management issues.',
+      'Adopt the persona of an analytical troubleshooting specialist. Analyze problem steps, mathematical proofs, code logic, or text excerpts with extreme precision, pinpointing logical flaws, calculation errors, and misconceptions.',
     badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
   },
 };
 
 const PRESET_TOPICS = [
-  'Explain the difference between TCP and UDP with real-world examples',
-  'What are the most common edge cases in Two Pointer algorithms?',
-  'How does indexing work internally in B-Trees for relational DBs?',
-  'Explain Virtual Memory, Page Faults, and TLB simply',
-  'Analyze the time & space complexity of Dijkstra vs A* algorithm',
-  'How does Raft consensus guarantee leader election safety?',
+  'Explain the geometric intuition behind Eigenvalues and Matrix transformations',
+  'What are the core mechanisms and equilibrium shifts in Chemical Thermodynamics?',
+  'How does the Due Process clause apply in modern Constitutional jurisprudence?',
+  'Break down the physiological cascade of cellular respiration and ATP generation',
+  'Explain how monetary policy interest rate adjustments impact inflation and GDP',
+  'What are the key invariants in Binary Search and Dijkstra shortest-path algorithms?',
 ];
 
 export const AIMentorScreen: React.FC<AIMentorScreenProps> = ({
   user,
+  initialContext,
   onLaunchPractice,
 }) => {
   const [settings, setSettings] = useState<AISettings>(loadAISettings());
@@ -118,6 +127,9 @@ export const AIMentorScreen: React.FC<AIMentorScreenProps> = ({
   const [loading, setLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [activeDiagnosticContext, setActiveDiagnosticContext] = useState<MentorContext | null>(
+    initialContext || null
+  );
 
   // Voice Speech Recognition State
   const [isListening, setIsListening] = useState(false);
@@ -126,15 +138,38 @@ export const AIMentorScreen: React.FC<AIMentorScreenProps> = ({
   // Text to Speech State
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+  const buildInitialGreeting = (ctx?: MentorContext | null): ChatMessage => {
+    if (ctx?.topic) {
+      const weakList = ctx.weakDimensions && ctx.weakDimensions.length > 0
+        ? ctx.weakDimensions.join(', ')
+        : 'Algorithmic Implementation and Edge-Case Analysis';
+      return {
+        id: 'm1',
+        role: 'assistant',
+        text: `Hello **${user.name.split(' ')[0]}**! I have loaded your recent cognitive diagnostic report for **${ctx.topic}** (Mastery: ${ctx.masteryScore || 65}%).\n\n🎯 **Target Growth Areas**: ${weakList}\n\nI am ready to help you eliminate these specific gaps through first-principles Socratic guidance, step-by-step invariants, and code proofs. What specific part would you like to explore first?`,
+        time: 'Just now',
+        modeUsed: 'socratic',
+      };
+    }
+
+    return {
       id: 'm1',
       role: 'assistant',
       text: `Hello **${user.name.split(' ')[0]}**! I am your AI Engineering Mentor.\n\nI'm customized for your **${user.year} · ${user.branch}** curriculum with active focus on **${user.shortGoals.map((g) => user.shortGoalLabels[g] || g).join(', ')}**.\n\nYou can ask conceptual questions, attach architectural diagrams or code screenshots for multimodal vision analysis, dictate using voice, or simulate mock interview scenarios.`,
       time: 'Just now',
       modeUsed: 'socratic',
-    },
-  ]);
+    };
+  };
+
+  const [messages, setMessages] = useState<ChatMessage[]>([buildInitialGreeting(initialContext)]);
+
+  // Update diagnostic context if prop changes
+  useEffect(() => {
+    if (initialContext?.topic && initialContext.topic !== activeDiagnosticContext?.topic) {
+      setActiveDiagnosticContext(initialContext);
+      setMessages([buildInitialGreeting(initialContext)]);
+    }
+  }, [initialContext]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -367,6 +402,16 @@ Student Academic Context:
 - Current Focus Goals: ${user.shortGoals.map((g) => user.shortGoalLabels[g] || g).join(', ')}
 - Long-Term Target: ${user.longGoals.join(', ')} (${user.skillName || 'Engineering Mastery'})
 
+${
+  activeDiagnosticContext?.topic
+    ? `DIAGNOSED KNOWLEDGE GAP CONTEXT (Targeted Cognitive Remediation):
+- Topic Being Remediated: ${activeDiagnosticContext.topic}
+- Assessed Mastery: ${activeDiagnosticContext.masteryScore || 60}%
+- Diagnosed Weak Dimensions: ${activeDiagnosticContext.weakDimensions?.join(', ') || 'Implementation and Edge Cases'}
+- Pedagogical Directive: Prioritize eliminating these diagnosed weak dimensions. Explain underlying mathematical and algorithmic invariants, trace edge cases rigorously, and provide step-by-step code proofs.`
+    : ''
+}
+
 Response Directives:
 1. Provide technically precise, crystal-clear, and mathematically grounded answers.
 2. If code is relevant, use clean, well-commented blocks with Big-O complexity annotations.
@@ -537,6 +582,55 @@ ${
           </div>
         </div>
       </div>
+
+      {/* Diagnostic Tutoring Active Banner */}
+      {activeDiagnosticContext?.topic && (
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/5 border border-indigo-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shrink-0">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> Cognitive Remediation Active
+              </span>
+              <span className="font-bold text-xs text-indigo-950">
+                Target: {activeDiagnosticContext.topic}
+              </span>
+              <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-md">
+                Mastery: {activeDiagnosticContext.masteryScore || 65}%
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-600 flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-slate-700">Diagnosed Growth Dimensions:</span>
+              {(activeDiagnosticContext.weakDimensions || ['Implementation', 'Debugging']).map((dim, idx) => (
+                <span key={idx} className="px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-700 font-bold text-[10px]">
+                  {dim}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() =>
+                handleSend(
+                  `Explain the fundamental invariant of ${activeDiagnosticContext.topic} and how to avoid bugs in ${activeDiagnosticContext.weakDimensions?.join(' and ') || 'implementation'}.`
+                )
+              }
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+            >
+              Start Remediation Drill
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveDiagnosticContext(null)}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white/80 transition cursor-pointer"
+              title="Dismiss Diagnostic Context"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Preset Topics Carousel */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 shrink-0 text-xs no-scrollbar">

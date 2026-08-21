@@ -48,6 +48,13 @@ import {
   Download,
   Copy,
   FileCode,
+  Bot,
+  ChevronDown,
+  ChevronUp,
+  GraduationCap,
+  Target,
+  ShieldCheck,
+  Compass,
 } from 'lucide-react';
 
 interface PracticeScreenProps {
@@ -55,6 +62,8 @@ interface PracticeScreenProps {
   initialTopic?: string;
   initialSubjectId?: string;
   onNavigateToResources?: (topic: string) => void;
+  onNavigateToMentor?: (topic: string, weakDimensions: string[], mastery: number) => void;
+  onNavigateToRoadmap?: (subjectId?: string) => void;
   onUpdateUser: (updated: UserProfile) => void;
 }
 
@@ -125,49 +134,44 @@ const ALL_QUESTION_TYPES: QuestionType[] = [
 
 export const UNIVERSAL_SUBJECT_PRESETS = [
   {
-    subject: 'Java',
-    badge: 'Programming',
-    topics: ['Exception Handling', 'Multithreading & Concurrency', 'Generics & Type Erasure', 'JVM Memory Model'],
-  },
-  {
-    subject: 'Python',
-    badge: 'Programming',
-    topics: ['Decorators & Wrappers', 'Generators & Iterators', 'Memory Management & GIL', 'Asyncio & Coroutines'],
-  },
-  {
-    subject: 'C++',
-    badge: 'Systems',
-    topics: ['Smart Pointers & RAII', 'Move Semantics & Rvalues', 'Templates & Metaprogramming', 'Pointers & Memory Layout'],
-  },
-  {
-    subject: 'Data Structures & Algorithms',
-    badge: 'CS Core',
-    topics: ['Binary Search & Invariants', 'Graph Traversals (BFS/DFS)', 'Dynamic Programming', 'Heap & Priority Queue'],
-  },
-  {
-    subject: 'Database Management Systems',
-    badge: 'Databases',
-    topics: ['ACID & Transaction Isolation', 'B-Tree & Hash Indexing', 'SQL Joins & Execution Plans', 'Database Normalization'],
-  },
-  {
-    subject: 'Operating Systems',
-    badge: 'Systems',
-    topics: ['Process Synchronization & Mutex', 'Virtual Memory & Paging', 'CPU Scheduling Algorithms', 'Deadlock Avoidance'],
-  },
-  {
-    subject: 'Computer Networks',
-    badge: 'Networking',
-    topics: ['TCP 3-Way Handshake & Teardown', 'DNS & HTTP/3 Protocol', 'Subnetting & CIDR', 'Routing Protocols (BGP/OSPF)'],
-  },
-  {
     subject: 'Mathematics',
-    badge: 'Applied Math',
-    topics: ['Quadratic Equations & Roots', 'Matrix Linear Transformations', 'Differential Calculus & Derivatives', 'Probability & Bayes Theorem'],
+    badge: 'Pure & Applied',
+    topics: ['Matrix Transformations & Eigenvalues', 'Differential Calculus & Rates', 'Bayesian Probability & Statistics', 'Number Theory & Cryptography'],
   },
   {
     subject: 'Physics',
-    badge: 'Engineering Science',
-    topics: ["Newton's Laws & Friction", 'Thermodynamics & Carnot Cycle', 'Electromagnetic Induction', 'Wave Optics & Interference'],
+    badge: 'Natural Sciences',
+    topics: ["Newton's Laws & Friction", 'Thermodynamics & Heat Engines', 'Electromagnetism & Maxwell Equations', 'Quantum Mechanics & Wave Packets'],
+  },
+  {
+    subject: 'Chemistry',
+    badge: 'Physical Science',
+    topics: ['Organic Reaction Mechanisms', 'Chemical Thermodynamics & Gibbs Energy', 'Electrochemistry & Redox Reactions', 'Atomic Orbitals & Hybridization'],
+  },
+  {
+    subject: 'Biology & Medicine',
+    badge: 'Life Sciences',
+    topics: ['Cellular Respiration & Krebs Cycle', 'DNA Replication & Gene Expression', 'Human Cardiovascular Physiology', 'Immunology & Antibody Response'],
+  },
+  {
+    subject: 'Economics & Finance',
+    badge: 'Social Sciences',
+    topics: ['Fiscal & Monetary Policy (Macro)', 'Elasticity & Market Equilibrium (Micro)', 'Discounted Cash Flow & Valuation', 'Portfolio Theory & CAPM'],
+  },
+  {
+    subject: 'Constitutional & Commercial Law',
+    badge: 'Law & Governance',
+    topics: ['Judicial Review & Due Process', 'Contract Formation & Breach Remedies', 'Tort Liability & Negligence', 'Intellectual Property Rights'],
+  },
+  {
+    subject: 'Languages & Linguistics',
+    badge: 'Humanities',
+    topics: ['Spanish Subjunctive Mood & Tenses', 'Japanese JLPT Grammar Particles', 'English Syntax & Argument Structure', 'French Irregular Verbs & Agreement'],
+  },
+  {
+    subject: 'Computer Science & Software',
+    badge: 'Engineering',
+    topics: ['Binary Search & Invariants', 'Graph Traversals (BFS/DFS)', 'Concurrency & Race Conditions', 'Database ACID & Indexing'],
   },
 ];
 
@@ -186,16 +190,19 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
   initialTopic = '',
   initialSubjectId = '',
   onNavigateToResources,
+  onNavigateToMentor,
+  onNavigateToRoadmap,
   onUpdateUser,
 }) => {
   // Setup Form State
   const [subjectTitle, setSubjectTitle] = useState(
-    initialSubjectId ? user.shortGoalLabels[initialSubjectId] || 'DSA' : 'Data Structures & Algorithms'
+    initialSubjectId || 'Mathematics'
   );
-  const [topic, setTopic] = useState(initialTopic || 'Binary Search & Two Pointers');
+  const [topic, setTopic] = useState(initialTopic || 'Matrix Transformations & Eigenvalues');
   const [targetDifficulty, setTargetDifficulty] = useState<'easy' | 'medium' | 'hard' | 'adaptive'>('adaptive');
   const [customSystemPrompt, setCustomSystemPrompt] = useState('');
   const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [showQuestionsReview, setShowQuestionsReview] = useState(false);
 
   // Active Session State
   const [session, setSession] = useState<AssessmentSession | null>(null);
@@ -342,7 +349,9 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
   };
 
   useEffect(() => {
-    setHistorySessions(loadAllAssessmentSessions());
+    if (user?.id) {
+      setHistorySessions(loadAllAssessmentSessions(user.id));
+    }
     async function verifyInference() {
       const aiSettings = loadAISettings();
       const serverGemini = await checkServerGeminiStatus();
@@ -352,7 +361,7 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
       setInferenceReason(readiness.reason || (configured ? '' : 'API key or inference provider is not configured.'));
     }
     verifyInference();
-  }, []);
+  }, [user?.id]);
 
   // Update prompt default if settings change
   useEffect(() => {
@@ -500,8 +509,8 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
       };
 
       setSession(updatedSession);
-      saveAssessmentSession(updatedSession);
-      setHistorySessions(loadAllAssessmentSessions());
+      saveAssessmentSession(updatedSession, user?.id);
+      setHistorySessions(loadAllAssessmentSessions(user?.id));
 
       // Update user stats
       const updatedUser = { ...user };
@@ -561,7 +570,7 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
       setUserResponses({});
       setLastProviderUsed(generated.providerUsed);
       setIsFallbackBatch(generated.isFallback);
-      saveAssessmentSession(updatedSession);
+      saveAssessmentSession(updatedSession, user?.id);
     } catch (e) {
       console.error('Failed to generate adapted batch:', e);
     } finally {
@@ -582,10 +591,10 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
       weakDimensions: session.weakDimensions,
       lastBatchCount: session.batches.length,
       updatedAt: new Date().toISOString(),
-    });
+    }, user?.id);
 
     setSession(null);
-    setHistorySessions(loadAllAssessmentSessions());
+    setHistorySessions(loadAllAssessmentSessions(user?.id));
   };
 
   const currentBatch = session ? session.batches[session.currentBatchIndex] : null;
@@ -811,13 +820,13 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
           <div className="relative z-10 max-w-2xl space-y-2.5">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-400/40 text-xs font-semibold tracking-wide text-indigo-200">
               <Sparkles className="w-3.5 h-3.5" />
-              Inference-Powered Adaptive Assessment Arena
+              2-Minute Cognitive Diagnostic Engine
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Adaptive Practice & Multi-Format Mastery
+              Determine What You Actually Understand
             </h1>
             <p className="text-indigo-200 text-sm leading-relaxed">
-              Experience the full 4-stage loop: Customize test & system prompt → AI generates Batch 1 → Submit answers → AI adapts the next batch based on your weak dimensions.
+              Most platforms guess where you should study. LearnPath evaluates your foundational concept, algorithmic logic, implementation, and debugging skills to generate your precision remediation roadmap.
             </p>
           </div>
         </div>
@@ -828,10 +837,10 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
             <div>
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Settings2 className="w-5 h-5 text-indigo-600" />
-                Step 1: Test Setup & Question Selection
+                Select Focus Topic & Diagnostic Settings
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Configure topic, question types with batch ceilings, and system prompt.
+                Pick a course or custom topic to start your live 2-minute diagnostic.
               </p>
             </div>
             <button
@@ -1014,12 +1023,12 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
                 {isLoadingBatch ? (
                   <>
                     <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    Generating Batch 1...
+                    Generating Diagnostic...
                   </>
                 ) : (
                   <>
                     <Play className="w-4 h-4 fill-white" />
-                    Launch Batch 1 Assessment
+                    Try a 2-Minute Diagnostic
                   </>
                 )}
               </button>
@@ -1104,81 +1113,184 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
   }
 
   // =============================================================
-  // RENDER: BATCH REVIEW & AI DIAGNOSIS (Step 4)
+  // RENDER: BATCH REVIEW & COGNITIVE DIAGNOSIS (Step 4)
   // =============================================================
   if (session.status === 'batch_reviewed') {
     const lastBatch = session.batches[session.currentBatchIndex];
     const score = lastBatch.batchScore || { totalEarned: 0, totalPossible: 100, percentage: 0 };
     const analysis = lastBatch.aiAnalysis || {
-      summary: 'Batch completed.',
+      summary: 'Diagnostic evaluation completed.',
       strengths: [],
       weaknesses: [],
-      recommendedFocus: 'Review fundamentals.',
+      recommendedFocus: 'Review foundational concepts.',
+      dimensionScores: {},
     };
+
+    const dimensionScores = analysis.dimensionScores || {};
+    const dimensionList: Array<{ key: string; label: string; desc: string }> = [
+      { key: 'concept', label: 'Conceptual Invariants', desc: 'Definitions, properties & core theory' },
+      { key: 'algorithmic_thinking', label: 'Algorithmic Logic', desc: 'Time/space complexity & step ordering' },
+      { key: 'application', label: 'Application & Synthesis', desc: 'Adapting to real-world problem constraints' },
+      { key: 'implementation', label: 'Implementation Syntax', desc: 'Code formulation & pointer structure' },
+      { key: 'debugging', label: 'Debugging & Edge-Cases', desc: 'Off-by-one errors & boundary tracing' },
+    ];
+
+    const isMastered = (session.overallMastery || score.percentage) >= 75;
+    const isPartial = (session.overallMastery || score.percentage) >= 50;
 
     return (
       <div className="space-y-6 max-w-4xl mx-auto">
-        {/* Score Banner */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs text-center space-y-4">
-          <div className="inline-flex p-3.5 rounded-full bg-indigo-50 text-indigo-600">
-            <Sparkles className="w-8 h-8" />
+        {/* Cognitive Diagnosis Hero Banner */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wide bg-indigo-50 text-indigo-700 mb-2">
+                <Sparkles className="w-3.5 h-3.5" />
+                Cognitive Diagnosis Verdict
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                {session.topic}
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Track: <span className="font-semibold text-slate-700">{session.subjectTitle}</span> · Batch {lastBatch.batchNumber} Completed
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-3 rounded-2xl shrink-0">
+              <div className="text-center px-2">
+                <div
+                  className={`text-3xl font-black ${
+                    isMastered
+                      ? 'text-emerald-600'
+                      : isPartial
+                      ? 'text-amber-600'
+                      : 'text-rose-600'
+                  }`}
+                >
+                  {session.overallMastery}%
+                </div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Topic Mastery
+                </div>
+              </div>
+
+              <div className="h-10 w-px bg-slate-200" />
+
+              <div className="space-y-1">
+                <span
+                  className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-1 rounded-lg ${
+                    isMastered
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : isPartial
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-rose-100 text-rose-900'
+                  }`}
+                >
+                  {isMastered ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Topic Mastered
+                    </>
+                  ) : isPartial ? (
+                    <>
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Remediation Needed
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Foundational Gaps
+                    </>
+                  )}
+                </span>
+                <div className="text-[11px] text-slate-500 font-medium">
+                  {score.totalEarned} / {score.totalPossible} pts in Batch {lastBatch.batchNumber}
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Batch {lastBatch.batchNumber} Evaluation Completed
+          {/* Socratic AI Evaluation Summary */}
+          <div className="p-4.5 rounded-xl bg-indigo-50/70 border border-indigo-100 space-y-1.5">
+            <div className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              Socratic Cognitive Assessment
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
-              {score.percentage >= 75
-                ? 'Excellent Conceptual Command!'
-                : score.percentage >= 50
-                ? 'Good Progress — Refinement Needed'
-                : 'Foundational Knowledge Gap Detected'}
-            </h2>
-            <p className="text-slate-500 text-sm mt-1 max-w-xl mx-auto">
-              Topic: <span className="font-bold text-slate-800">{session.topic}</span> ({session.subjectTitle})
+            <p className="text-sm text-indigo-950 leading-relaxed">
+              {analysis.summary}
             </p>
           </div>
 
-          {/* Stats Badges */}
-          <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto pt-2">
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-xs text-slate-500 font-medium">Batch Score</div>
-              <div className="text-xl font-extrabold text-indigo-700">{score.percentage}%</div>
+          {/* 5-Dimensional Cognitive Intelligence Visualizer */}
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-indigo-600" />
+                5-Dimensional Cognitive Breakdown
+              </h3>
+              <span className="text-[11px] text-slate-400 font-medium">
+                Derived from rule assertions & AI reasoning
+              </span>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-xs text-slate-500 font-medium">Points Earned</div>
-              <div className="text-xl font-extrabold text-emerald-600">
-                {score.totalEarned}/{score.totalPossible}
-              </div>
-            </div>
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-xs text-slate-500 font-medium">Overall Mastery</div>
-              <div className="text-xl font-extrabold text-purple-700">{session.overallMastery}%</div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {dimensionList.map((dim) => {
+                const rawScore = dimensionScores[dim.key] ?? (isMastered ? 85 : isPartial ? 60 : 35);
+                const isDimHigh = rawScore >= 75;
+                const isDimMed = rawScore >= 50;
+
+                return (
+                  <div
+                    key={dim.key}
+                    className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 flex flex-col justify-between gap-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">{dim.label}</div>
+                        <div className="text-[10px] text-slate-500 leading-tight">{dim.desc}</div>
+                      </div>
+                      <span
+                        className={`text-xs font-black px-2 py-0.5 rounded-md ${
+                          isDimHigh
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : isDimMed
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
+                        {rawScore}%
+                      </span>
+                    </div>
+
+                    <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          isDimHigh
+                            ? 'bg-emerald-500'
+                            : isDimMed
+                            ? 'bg-amber-500'
+                            : 'bg-rose-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(8, rawScore))}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
 
-        {/* AI Diagnostic Breakdown */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-600" />
-            AI Cognitive Breakdown & Adaptation Strategy
-          </h3>
-
-          <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-100 text-indigo-950 text-sm leading-relaxed">
-            {analysis.summary}
-          </div>
-
+          {/* Strengths & Weaknesses Comparison Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
             {analysis.strengths?.length > 0 && (
               <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-2">
                 <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Identified Strengths
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Identified Strengths
                 </div>
-                <ul className="text-xs text-emerald-900/90 space-y-1 list-disc list-inside">
+                <ul className="text-xs text-emerald-900/90 space-y-1.5 list-disc list-inside">
                   {analysis.strengths.map((s, i) => (
-                    <li key={i}>{s}</li>
+                    <li key={i} className="leading-relaxed">{s}</li>
                   ))}
                 </ul>
               </div>
@@ -1187,102 +1299,139 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
             {analysis.weaknesses?.length > 0 && (
               <div className="p-4 rounded-xl bg-rose-50/60 border border-rose-200 space-y-2">
                 <div className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4 text-rose-600" /> Areas Needing Focus
+                  <AlertCircle className="w-4 h-4 text-rose-600" />
+                  Diagnosed Knowledge Gaps (Focus Areas)
                 </div>
-                <ul className="text-xs text-rose-900/90 space-y-1 list-disc list-inside">
+                <ul className="text-xs text-rose-900/90 space-y-1.5 list-disc list-inside">
                   {analysis.weaknesses.map((w, i) => (
-                    <li key={i}>{w}</li>
+                    <li key={i} className="leading-relaxed">{w}</li>
                   ))}
                 </ul>
               </div>
             )}
           </div>
 
+          {/* Adaptive Recommendation Card */}
           {analysis.recommendedFocus && (
-            <div className="text-xs text-slate-600 pt-2 flex items-start gap-2">
-              <span className="font-bold text-slate-800 shrink-0">Adaptive Next Step:</span>
-              <span>{analysis.recommendedFocus}</span>
+            <div className="p-3.5 rounded-xl bg-slate-100/90 border border-slate-200 flex items-start gap-2.5">
+              <Compass className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-slate-700 leading-relaxed">
+                <span className="font-bold text-slate-900">Recommended Next Step: </span>
+                {analysis.recommendedFocus}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Detailed Question Review List */}
+        {/* Action Decision Hub (Remediate vs. Advance) */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-slate-700" />
-            Batch Questions & Solution Review
-          </h3>
-
-          <div className="space-y-4">
-            {lastBatch.questions.map((q, idx) => {
-              const sub = lastBatch.submissions[q.id];
-              return (
-                <div
-                  key={q.id}
-                  className={`p-4.5 rounded-xl border-1.5 transition space-y-3 ${
-                    sub?.isCorrect
-                      ? 'border-emerald-200 bg-emerald-50/20'
-                      : 'border-rose-200 bg-rose-50/20'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-md bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center">
-                        {idx + 1}
-                      </span>
-                      <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">
-                        [{q.type.replace('_', ' ')}]
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-xs font-bold">
-                      {sub?.isCorrect ? (
-                        <span className="text-emerald-700 flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4" /> Correct (+{sub.scoreEarned} pts)
-                        </span>
-                      ) : (
-                        <span className="text-rose-700 flex items-center gap-1">
-                          <XCircle className="w-4 h-4" /> Incorrect ({sub?.scoreEarned || 0}/{q.points || 10} pts)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="text-sm font-semibold text-slate-900">{q.question}</div>
-
-                  <QuestionDispatcher
-                    question={q}
-                    userResponse={sub?.userResponse}
-                    onChange={() => {}}
-                    submission={sub}
-                    isSubmitted={true}
-                  />
-
-                  {q.explanation && (
-                    <div className="p-3 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-700 leading-relaxed">
-                      <span className="font-bold text-slate-900">Explanation:</span> {q.explanation}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-indigo-600" />
+                Adaptive Next Steps
+              </h3>
+              <p className="text-xs text-slate-500">
+                {isMastered
+                  ? 'Great work! You have cleared the mastery threshold for this topic.'
+                  : 'Target your diagnosed weak areas with adapted practice, live resources, or AI tutoring.'}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            {onNavigateToResources && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Primary Action Button */}
+            {!isMastered ? (
               <button
                 type="button"
-                onClick={() => onNavigateToResources(session.topic)}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 hover:border-indigo-400 bg-white text-xs font-bold text-indigo-700 flex items-center justify-center gap-1.5"
+                disabled={isLoadingBatch}
+                onClick={handleGenerateNextAdaptedBatch}
+                className="p-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition flex flex-col justify-between gap-3 text-left cursor-pointer group"
               >
-                <Search className="w-3.5 h-3.5" />
-                Search Live Resources
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-indigo-200">
+                    Remediation Loop
+                  </span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <div>
+                  <div className="font-extrabold text-sm">
+                    {isLoadingBatch ? `Generating Batch ${lastBatch.batchNumber + 1}...` : `Adapted Batch ${lastBatch.batchNumber + 1}`}
+                  </div>
+                  <div className="text-[11px] text-indigo-100 mt-0.5">
+                    Generate questions tailored directly to your diagnosed weak dimensions.
+                  </div>
+                </div>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onNavigateToRoadmap?.(session.subjectId)}
+                className="p-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition flex flex-col justify-between gap-3 text-left cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-emerald-200">
+                    Mastery Cleared
+                  </span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <div>
+                  <div className="font-extrabold text-sm">Advance in Roadmap</div>
+                  <div className="text-[11px] text-emerald-100 mt-0.5">
+                    Unlock and start the next sequential topic in your track.
+                  </div>
+                </div>
               </button>
             )}
 
+            {/* Targeted Resources Button */}
+            <button
+              type="button"
+              onClick={() => onNavigateToResources?.(session.topic)}
+              className="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs transition flex flex-col justify-between gap-3 text-left cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-extrabold tracking-wider text-indigo-600">
+                  Targeted Learning
+                </span>
+                <Search className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition" />
+              </div>
+              <div>
+                <div className="font-extrabold text-sm text-slate-900">Curate Resources</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Fetch live web articles, tutorials & videos for {session.topic}.
+                </div>
+              </div>
+            </button>
+
+            {/* AI Mentor Socratic Help */}
+            <button
+              type="button"
+              onClick={() =>
+                onNavigateToMentor?.(
+                  session.topic,
+                  analysis.weaknesses || [],
+                  session.overallMastery || score.percentage
+                )
+              }
+              className="p-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs transition flex flex-col justify-between gap-3 text-left cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-extrabold tracking-wider text-purple-600">
+                  Socratic AI Tutor
+                </span>
+                <Bot className="w-4 h-4 text-slate-400 group-hover:text-purple-600 transition" />
+              </div>
+              <div>
+                <div className="font-extrabold text-sm text-slate-900">Ask AI Mentor</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Deep-dive into diagnosed gaps with an interactive tutor.
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
             {/* Instant Export for Testing */}
             <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-xl p-1">
               <button
@@ -1303,36 +1452,110 @@ export const PracticeScreen: React.FC<PracticeScreenProps> = ({
                 <Copy className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
               type="button"
               onClick={handleFinishAssessment}
-              className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-sm"
+              className="px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer"
             >
-              Finish & Save Mastery
+              Finish & Return to Dashboard
             </button>
+          </div>
+        </div>
+
+        {/* Collapsible Detailed Question Review Section */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-slate-700" />
+                Diagnostic Question Review ({lastBatch.questions.length} Items)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Inspect your responses, automated correctness assertions, and step-by-step solutions.
+              </p>
+            </div>
 
             <button
               type="button"
-              disabled={isLoadingBatch}
-              onClick={handleGenerateNextAdaptedBatch}
-              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+              onClick={() => setShowQuestionsReview(!showQuestionsReview)}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 hover:border-indigo-300 text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer"
             >
-              {isLoadingBatch ? (
+              {showQuestionsReview ? (
                 <>
-                  <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Adapting Batch {lastBatch.batchNumber + 1}...
+                  <span>Hide Details</span>
+                  <ChevronUp className="w-4 h-4" />
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
-                  Generate Adapted Batch {lastBatch.batchNumber + 1}
+                  <span>Inspect All Questions</span>
+                  <ChevronDown className="w-4 h-4" />
                 </>
               )}
             </button>
           </div>
+
+          {showQuestionsReview && (
+            <div className="space-y-4 pt-2 border-t border-slate-100">
+              {lastBatch.questions.map((q, idx) => {
+                const sub = lastBatch.submissions[q.id];
+                return (
+                  <div
+                    key={q.id}
+                    className={`p-4.5 rounded-xl border-1.5 transition space-y-3 ${
+                      sub?.isCorrect
+                        ? 'border-emerald-200 bg-emerald-50/20'
+                        : 'border-rose-200 bg-rose-50/20'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-md bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">
+                          [{q.type.replace('_', ' ')}]
+                        </span>
+                        {q.dimension && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 uppercase">
+                            {q.dimension}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                        {sub?.isCorrect ? (
+                          <span className="text-emerald-700 flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4" /> Correct (+{sub.scoreEarned} pts)
+                          </span>
+                        ) : (
+                          <span className="text-rose-700 flex items-center gap-1">
+                            <XCircle className="w-4 h-4" /> Incorrect ({sub?.scoreEarned || 0}/{q.points || 10} pts)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-sm font-semibold text-slate-900">{q.question}</div>
+
+                    <QuestionDispatcher
+                      question={q}
+                      userResponse={sub?.userResponse}
+                      onChange={() => {}}
+                      submission={sub}
+                      isSubmitted={true}
+                    />
+
+                    {q.explanation && (
+                      <div className="p-3 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                        <span className="font-bold text-slate-900">Explanation:</span> {q.explanation}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );

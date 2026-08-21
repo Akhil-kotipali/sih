@@ -511,7 +511,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         Server-side Gemini Active (Default Mode)
                       </div>
                       <p className="text-[11px] text-emerald-800 leading-relaxed">
-                        Routes through your server proxy <code>/api/ai/generate</code> using the container's <code>GEMINI_API_KEY</code> with automated fallback to <code>gemini-3.6-flash</code>, <code>gemini-3.5-flash-lite</code>, and <code>gemini-3.7-flash</code>.
+                        Routes through your server proxy <code>/api/ai/generate</code> using the container's <code>GEMINI_API_KEY</code> with automated fallback to <code>gemini-3.7-flash</code>, <code>gemini-flash-latest</code>, and <code>gemini-3.1-flash-lite</code>.
                       </p>
                     </div>
 
@@ -552,7 +552,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               models: { ...settings.models, gemini: e.target.value },
                             })
                           }
-                          placeholder="gemini-3.6-flash"
+                          placeholder="gemini-3.7-flash"
                           className="w-full pl-3.5 pr-8 py-2 rounded-lg border border-slate-300 text-xs font-mono bg-white outline-none focus:border-indigo-600"
                         />
                         {Boolean(settings.models?.gemini) && (
@@ -573,7 +573,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                       <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-slate-500">
                         <span>Presets:</span>
-                        {['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.7-flash'].map((m) => (
+                        {['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.6-flash'].map((m) => (
                           <button
                             type="button"
                             key={m}
@@ -584,7 +584,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               })
                             }
                             className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
-                              (settings.models?.gemini || 'gemini-3.6-flash') === m
+                              (settings.models?.gemini || 'gemini-3.7-flash') === m
                                 ? 'bg-indigo-600 text-white font-bold'
                                 : 'bg-slate-200/70 hover:bg-indigo-100 hover:text-indigo-700 text-slate-700'
                             }`}
@@ -706,7 +706,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               models: { ...settings.models, gemini: e.target.value },
                             })
                           }
-                          placeholder="gemini-3.6-flash"
+                          placeholder="gemini-3.7-flash"
                           className="w-full pl-3.5 pr-8 py-2 rounded-lg border border-slate-300 text-xs font-mono bg-white outline-none focus:border-indigo-600"
                         />
                         {Boolean(settings.models?.gemini) && (
@@ -727,7 +727,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                       <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-slate-500">
                         <span>Presets:</span>
-                        {['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.7-flash'].map((m) => (
+                        {['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.6-flash'].map((m) => (
                           <button
                             type="button"
                             key={m}
@@ -738,7 +738,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               })
                             }
                             className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
-                              (settings.models?.gemini || 'gemini-3.6-flash') === m
+                              (settings.models?.gemini || 'gemini-3.7-flash') === m
                                 ? 'bg-indigo-600 text-white font-bold'
                                 : 'bg-slate-200/70 hover:bg-indigo-100 hover:text-indigo-700 text-slate-700'
                             }`}

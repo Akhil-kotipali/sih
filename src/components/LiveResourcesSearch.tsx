@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LiveResource } from '../types';
+import { UserProfile, LiveResource } from '../types';
 import {
   searchLiveResources,
   PLATFORM_SEARCH_HUBS,
@@ -21,35 +21,41 @@ import {
   Filter,
   Check,
   Zap,
+  Bot,
 } from 'lucide-react';
 
 interface LiveResourcesSearchProps {
+  user?: UserProfile;
   initialQuery?: string;
   onLaunchPracticeTopic?: (topic: string) => void;
+  onLaunchMentor?: (topic: string) => void;
 }
 
 const CATEGORIES = [
   { id: 'all', label: 'All Resources', icon: Search },
   { id: 'video', label: 'Video Lessons', icon: Video },
   { id: 'article', label: 'In-Depth Articles', icon: BookOpen },
-  { id: 'documentation', label: 'Official Docs', icon: FileText },
-  { id: 'practice', label: 'Problem Sets', icon: Code },
-  { id: 'interactive', label: 'Courses & Repos', icon: Award },
+  { id: 'documentation', label: 'Official Docs & Texts', icon: FileText },
+  { id: 'practice', label: 'Problem Sets & Exercises', icon: Code },
+  { id: 'interactive', label: 'Interactive Courses', icon: Award },
 ];
 
 const POPULAR_TOPICS = [
-  'Binary Search Trees',
-  'Process Scheduling & Deadlocks',
-  'TCP 3-Way Handshake & OSI Model',
-  'Database Normalization & ACID',
-  'Dynamic Programming Patterns',
-  'System Design High-Level Architecture',
-  'REST API & Asynchronous Microservices',
+  'Linear Algebra Matrix Invariants',
+  'Organic Chemistry Synthesis Reactions',
+  'Macroeconomics Fiscal & Monetary Policy',
+  'Constitutional Due Process & Law',
+  'Cellular Respiration & Krebs Cycle',
+  'Spanish Subjunctive Verb Conjugation',
+  'Database Indexing & ACID Guarantees',
+  'Distributed Systems Concurrency',
 ];
 
 export const LiveResourcesSearch: React.FC<LiveResourcesSearchProps> = ({
-  initialQuery = 'Data Structures & Algorithms',
+  user,
+  initialQuery = 'Linear Algebra Matrix Invariants',
   onLaunchPracticeTopic,
+  onLaunchMentor,
 }) => {
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState<string>('all');
@@ -61,9 +67,16 @@ export const LiveResourcesSearch: React.FC<LiveResourcesSearchProps> = ({
   const [bookmarks, setBookmarks] = useState<LiveResource[]>([]);
 
   useEffect(() => {
-    setBookmarks(loadBookmarkedResources());
+    setBookmarks(loadBookmarkedResources(user?.id));
     handleSearch(initialQuery);
-  }, []);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (initialQuery && initialQuery !== query) {
+      setQuery(initialQuery);
+      handleSearch(initialQuery, category);
+    }
+  }, [initialQuery]);
 
   const handleSearch = async (searchTerm: string, cat = category) => {
     if (!searchTerm.trim()) return;
@@ -327,11 +340,22 @@ export const LiveResourcesSearch: React.FC<LiveResourcesSearchProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {onLaunchMentor && (
+                        <button
+                          type="button"
+                          onClick={() => onLaunchMentor(res.tags?.[0] || query)}
+                          className="px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                          title="Discuss this topic with AI Mentor"
+                        >
+                          <Bot className="w-3 h-3 text-purple-600" /> Mentor
+                        </button>
+                      )}
+
                       {onLaunchPracticeTopic && (
                         <button
                           type="button"
                           onClick={() => onLaunchPracticeTopic(res.tags?.[0] || query)}
-                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition flex items-center gap-1"
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
                         >
                           <Zap className="w-3 h-3" /> Practice
                         </button>
