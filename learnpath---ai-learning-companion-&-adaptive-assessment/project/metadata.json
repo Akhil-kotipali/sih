@@ -1,0 +1,7 @@
+{
+  "name": "LearnPath - AI Learning Companion & Adaptive Assessment",
+  "description": "Adaptive learning companion with live resource search, multi-batch multi-format assessments (MCQ, True/False, Fill in Blank, Code, Debugging, Arrange Steps, Explanations), personalized roadmaps, and local persistence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
